@@ -37,6 +37,7 @@ defmodule TelemetryInfluxDB.EventHandler do
       config
       |> Map.delete(:events)
       |> Map.put(:metadata_tag_keys, event_spec[:metadata_tag_keys] || [])
+      |> Map.put(:tag_values, event_spec[:tag_values] || & &1)
 
     handler_id = handler_id(event_spec.name, config.reporter_name)
 
@@ -54,7 +55,7 @@ defmodule TelemetryInfluxDB.EventHandler do
         ) :: :ok
   def handle_event(event, measurements, metadata, config) do
     event_tags = Map.get(metadata, :tags, %{})
-    event_metadatas = Map.take(metadata, config.metadata_tag_keys)
+    event_metadatas = extract_tags(config, metadata)
 
     tags =
       Map.merge(config.tags, event_tags)
@@ -66,6 +67,11 @@ defmodule TelemetryInfluxDB.EventHandler do
     |> BatchReporter.enqueue_event({formatted_event, config})
 
     :ok
+  end
+
+  defp extract_tags(config, metadata) do
+    tag_values = config.tag_values.(metadata)
+    Map.take(tag_values, config.metadata_tag_keys)
   end
 
   @spec handler_id(InfluxDB.event_name(), binary()) :: InfluxDB.handler_id()
